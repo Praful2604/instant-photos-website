@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:major_project_website/screens/landing_page_screens/hero_section.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../customer_auth_pages/customer_login_page.dart';
+import '../home_page.dart';
 import 'user_choice_selection_page.dart';
-
 
 class QRScannerPage extends StatefulWidget {
   const QRScannerPage({Key? key}) : super(key: key);
@@ -56,10 +57,24 @@ class _QRScannerPageState extends State<QRScannerPage>
     final user = _auth.currentUser;
     final prefs = await SharedPreferences.getInstance();
     final userRole = prefs.getString('userRole');
-    
+
     setState(() {
       _isAuthenticated = user != null && userRole == 'customer';
     });
+  }
+
+  Future<void> _logout() async {
+    await _auth.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HomePage(),
+        ),
+      );
+    }
   }
 
   @override
@@ -245,6 +260,13 @@ class _QRScannerPageState extends State<QRScannerPage>
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: _logout,
+          )
+        ],
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -391,10 +413,7 @@ class _QRScannerPageState extends State<QRScannerPage>
                                 fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 6),
-                          Text(
-                            'Event Date: ${eventData!['created_at'] ?? 'N/A'}',
-                            style: const TextStyle(fontSize: 14),
-                          ),
+
                         ] else if (result != "No QR code scanned yet") ...[
                           const SizedBox(height: 10),
                           const Text(

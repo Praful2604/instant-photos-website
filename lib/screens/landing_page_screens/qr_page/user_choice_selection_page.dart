@@ -5,6 +5,9 @@ import 'package:major_project_website/screens/client_pages/gallery_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../home_page.dart';
 
 class UserChoiceSelectionPage extends StatefulWidget {
   final String initialQrCode;
@@ -52,7 +55,7 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage> {
             ),
           );
         } else {
-          _showAccessDeniedMessage("You did not get access. Your email does not match the registered client details.");
+          _showAccessDeniedMessage("You did not get access.");
         }
       } else {
         _showAccessDeniedMessage("No client details found for this QR code. Please contact the administrator.");
@@ -62,7 +65,19 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage> {
       _showAccessDeniedMessage("Unable to verify your access. Please try again later.");
     }
   }
-
+  Future<void> _logout() async {
+    await _auth.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const HomePage(),
+        ),
+      );
+    }
+  }
   void _showAccessDeniedMessage(String message) {
     showDialog(
       context: context,
@@ -119,7 +134,13 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10,),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: _logout,
+          ),
+
         ],
       ),
       body: Container(
