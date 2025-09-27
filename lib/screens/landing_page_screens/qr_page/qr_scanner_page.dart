@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../customer_auth_pages/customer_login_page.dart';
+import 'user_choice_selection_page.dart';
 
-// Import your UserChoiceSelectionPage here
-import 'user_choice_selection_page.dart'; // Update this with your actual import
 
 class QRScannerPage extends StatefulWidget {
   const QRScannerPage({Key? key}) : super(key: key);
@@ -25,12 +27,15 @@ class _QRScannerPageState extends State<QRScannerPage>
 
   // Firestore instance
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Map<String, dynamic>? eventData;
+  bool _isAuthenticated = false;
 
   @override
   void initState() {
     super.initState();
+    _checkAuthentication();
 
     _animationController = AnimationController(
       vsync: this,
@@ -45,6 +50,16 @@ class _QRScannerPageState extends State<QRScannerPage>
     );
 
     _animationController.repeat(reverse: true);
+  }
+
+  Future<void> _checkAuthentication() async {
+    final user = _auth.currentUser;
+    final prefs = await SharedPreferences.getInstance();
+    final userRole = prefs.getString('userRole');
+    
+    setState(() {
+      _isAuthenticated = user != null && userRole == 'customer';
+    });
   }
 
   @override
@@ -113,8 +128,15 @@ class _QRScannerPageState extends State<QRScannerPage>
           });
           // Navigate if a match is found and required
           if (navigateOnMatch) {
-            Navigator.push(context, MaterialPageRoute(builder: (context)=>UserChoiceSelectionPage(initialQrCode: qrCode, eventName: '',
-            )),);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserChoiceSelectionPage(
+                  initialQrCode: qrCode,
+                  eventName: data['event_name'] ?? 'Event',
+                ),
+              ),
+            );
           }
         }
       } else {
@@ -136,6 +158,80 @@ class _QRScannerPageState extends State<QRScannerPage>
 
   @override
   Widget build(BuildContext context) {
+    // Check authentication first
+    if (!_isAuthenticated) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFdbeafe), Color(0xFF60a5fa)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: Center(
+            child: Card(
+              margin: const EdgeInsets.all(24),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.lock,
+                      size: 64,
+                      color: Colors.red,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Authentication Required',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'You need to login first to access the QR Scanner.',
+                      style: TextStyle(fontSize: 16),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CustomerLoginPage(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                      ),
+                      child: const Text(
+                        'Go to Login',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
 
@@ -324,8 +420,9 @@ class _QRScannerPageState extends State<QRScannerPage>
                             context,
                             MaterialPageRoute(
                               builder: (context) => UserChoiceSelectionPage(
-                                  initialQrCode: 'initialQrCode',
-                                  eventName: 'eventName'),
+                                initialQrCode: result,
+                                eventName: eventData!['event_name'] ?? 'Event',
+                              ),
                             ),
                           );
                         }
