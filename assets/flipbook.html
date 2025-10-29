@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Flipbook</title>
+    <style>
+        body {
+          margin: 0;
+          background: #222;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+        }
+        .page {
+          width: 400px;
+          height: 600px;
+          position: relative;
+          perspective: 1500px;
+        }
+        .paper {
+          width: 100%;
+          height: 100%;
+          position: absolute;
+          transform-style: preserve-3d;
+          transition: transform 0.8s ease;
+          cursor: pointer;
+        }
+        .paper.flipped {
+          transform: rotateY(-180deg);
+        }
+        .paper img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          backface-visibility: hidden;
+          border-radius: 12px;
+        }
+        .paper .back {
+          transform: rotateY(180deg);
+          background: #111;
+        }
+    </style>
+</head>
+<body>
+<div class="page" id="flipbook">
+    <div class="paper"><img src="image1.jpg" alt="front"></div>
+    <div class="paper"><img src="image2.jpg" alt="back"></div>
+</div>
+
+<script>
+    const pages = document.querySelectorAll('.paper');
+    let current = 0;
+
+    document.body.addEventListener('click', () => {
+      if (current < pages.length) {
+        pages[current].classList.add('flipped');
+        current++;
+      } else {
+        pages.forEach(p => p.classList.remove('flipped'));
+        current = 0;
+      }
+    });
+</script>
+</body>
+</html>

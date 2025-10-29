@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:major_project_website/screens/client_pages/client_otp_login_page.dart';
+import 'package:major_project_website/screens/client_pages/flip_book_page.dart';
 import 'package:major_project_website/screens/client_pages/gallery_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:major_project_website/screens/landing_page_screens/qr_page/upload_selfie_page.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../home_page.dart';
+import 'face_match_upload_selfie.dart';
 
 class UserChoiceSelectionPage extends StatefulWidget {
   final String initialQrCode;
@@ -192,7 +195,14 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage> {
                   context,
                   title: 'View My Photos',
                   icon: Icons.photo,
-                  onPressed: _checkClientAccess,
+                  onPressed:(){
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>FaceMatchUploadPage(),
+
+                        ));
+                  } ,
                 ),
                 const SizedBox(height: 20),
                 _buildChoiceButton(
@@ -200,7 +210,12 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage> {
                   title: 'View Digital Album',
                   icon: Icons.photo_album_outlined,
                   onPressed: () {
-                    // Navigate to your FlipBookPage here with initialQrCode and eventName
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>FlipBookPage(qrCode: widget.initialQrCode),
+
+                        ));
                   },
                 ),
               ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:major_project_website/screens/admin_pages/add_photos_page.dart';
+import 'package:major_project_website/screens/admin_pages/album_images.dart';
 import 'package:major_project_website/screens/admin_pages/client_details_Page.dart';
 import 'package:major_project_website/screens/admin_pages/view_photos_page.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -183,7 +184,11 @@ class _EventListPageState extends State<EventListPage> {
         ),
         IconButton(
           onPressed: () {
-
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AlbumImages(qrCode: qrCode, eventName: '',),
+                ));
           },
           icon: const Icon(Icons.photo_library, color: Colors.orange),
           tooltip: "View 3D Album",
