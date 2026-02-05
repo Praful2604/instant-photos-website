@@ -10,7 +10,8 @@ class GalleryPage extends StatefulWidget {
   State<GalleryPage> createState() => _GalleryPageState();
 }
 
-class _GalleryPageState extends State<GalleryPage> with TickerProviderStateMixin {
+class _GalleryPageState extends State<GalleryPage>
+    with TickerProviderStateMixin {
   late TabController _tabController;
   List<String> imageUrls = [];
   Set<String> favoritePaths = {};
@@ -35,7 +36,6 @@ class _GalleryPageState extends State<GalleryPage> with TickerProviderStateMixin
 
   String proxyImageUrl(String path) => '$proxyBaseUrl?path=$path';
 
-  /// 🔹 Listen for Firestore updates in real-time
   void listenToFavorites() {
     FirebaseFirestore.instance
         .collection('favorites')
@@ -50,39 +50,36 @@ class _GalleryPageState extends State<GalleryPage> with TickerProviderStateMixin
     });
   }
 
-  /// 🔹 Fetch all images from Firebase Storage (read-only)
   Future<void> fetchImagesFromStorage() async {
     try {
-      final ref = FirebaseStorage.instance.ref('event-images/${widget.qrCode}');
+      final ref =
+      FirebaseStorage.instance.ref('event-images/${widget.qrCode}');
       final result = await ref.listAll();
       setState(() {
         imageUrls =
-            result.items.map((item) => proxyImageUrl(item.fullPath)).toList();
+            result.items.map((i) => proxyImageUrl(i.fullPath)).toList();
         isLoading = false;
       });
-    } catch (e) {
-      print('Error fetching images: $e');
+    } catch (_) {
       setState(() => isLoading = false);
     }
   }
 
-  /// 🔹 Add or remove image from favorites
   Future<void> toggleFavorite(String fullPath) async {
-    final imgsCollection = FirebaseFirestore.instance
+    final ref = FirebaseFirestore.instance
         .collection('favorites')
         .doc(widget.qrCode)
         .collection('imgs');
 
-    final imageName = fullPath.split('/').last;
-    final docRef = imgsCollection.doc(imageName);
-    final isFavorite = favoritePaths.contains(fullPath);
+    final name = fullPath.split('/').last;
+    final doc = ref.doc(name);
 
-    if (isFavorite) {
-      await docRef.delete();
+    if (favoritePaths.contains(fullPath)) {
+      await doc.delete();
     } else {
-      await docRef.set({
+      await doc.set({
         'path': fullPath,
-        'favoritedAt': FieldValue.serverTimestamp(),
+        'time': FieldValue.serverTimestamp(),
       });
     }
   }
@@ -97,104 +94,119 @@ class _GalleryPageState extends State<GalleryPage> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Gallery')),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
+      backgroundColor: const Color(0xFF0F2027),
       appBar: AppBar(
-        title: const Text('Gallery'),
+        title: const Text("Gallery"),
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: Colors.cyanAccent,
           tabs: const [
-            Tab(icon: Icon(Icons.image), text: 'All Photos'),
-            Tab(icon: Icon(Icons.favorite), text: 'Favorites'),
+            Tab(icon: Icon(Icons.photo), text: "All Photos"),
+            Tab(icon: Icon(Icons.favorite), text: "Favorites"),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          buildGridView(imageUrls),
-          buildGridView(favoriteImageUrls, favoritesOnly: true),
+          buildGrid(imageUrls),
+          buildGrid(favoriteImageUrls, favoritesOnly: true),
         ],
       ),
     );
   }
 
-  /// 🔹 Builds a grid of all or favorite photos
-  Widget buildGridView(List<String> urls, {bool favoritesOnly = false}) {
+  Widget buildGrid(List<String> urls, {bool favoritesOnly = false}) {
     if (urls.isEmpty) {
       return Center(
         child: Text(
-          favoritesOnly ? 'No favorite photos yet.' : 'No photos available.',
-          style: const TextStyle(fontSize: 16),
+          favoritesOnly ? "No favorites yet ❤️" : "No photos found 📸",
+          style: const TextStyle(color: Colors.white70, fontSize: 16),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(12),
       child: GridView.builder(
         itemCount: urls.length,
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 4,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
         ),
         itemBuilder: (context, index) {
           final proxyUrl = urls[index];
           final fullPath = extractFullPath(proxyUrl);
-          final isFavorite = favoritePaths.contains(fullPath);
+          final isFav = favoritePaths.contains(fullPath);
 
-          return Stack(
-            children: [
-              GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FullScreenImageViewer(
-                      imageUrls: favoritesOnly ? favoriteImageUrls : imageUrls,
-                      initialIndex: index,
-                      favoritePaths: favoritePaths,
-                      onToggleFavorite: (path) async {
-                        await toggleFavorite(path);
-                        setState(() {}); // Refresh grid immediately
-                      },
+          return GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FullScreenImageViewer(
+                  imageUrls: favoritesOnly ? favoriteImageUrls : imageUrls,
+                  initialIndex: index,
+                  favoritePaths: favoritePaths,
+                  onToggleFavorite: toggleFavorite,
+                ),
+              ),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black45,
+                    blurRadius: 6,
+                    offset: Offset(0, 4),
+                  )
+                ],
+              ),
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      proxyUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
                     ),
                   ),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    proxyUrl,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const Center(child: CircularProgressIndicator());
-                    },
-                    errorBuilder: (context, error, stackTrace) =>
-                    const Center(child: Icon(Icons.error)),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black54,
+                      child: IconButton(
+                        icon: Icon(
+                          isFav
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          color: isFav ? Colors.red : Colors.white,
+                          size: 20,
+                        ),
+                        onPressed: () async {
+                          await toggleFavorite(fullPath);
+                          setState(() {});
+                        },
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-              Positioned(
-                top: 6,
-                right: 6,
-                child: IconButton(
-                  icon: Icon(
-                    isFavorite ? Icons.favorite : Icons.favorite_border,
-                    color: isFavorite ? Colors.red : Colors.white,
-                  ),
-                  onPressed: () async {
-                    await toggleFavorite(fullPath);
-                    setState(() {}); // Refresh UI immediately
-                  },
-                ),
-              ),
-            ],
+            ),
           );
         },
       ),
@@ -202,129 +214,114 @@ class _GalleryPageState extends State<GalleryPage> with TickerProviderStateMixin
   }
 }
 
-/// 🔹 Full-screen image viewer with favorite toggle
+
+
 class FullScreenImageViewer extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;
   final Set<String> favoritePaths;
-  final Function(String fullPath) onToggleFavorite;
+  final Function(String) onToggleFavorite;
 
   const FullScreenImageViewer({
-    Key? key,
+    super.key,
     required this.imageUrls,
     required this.initialIndex,
     required this.favoritePaths,
     required this.onToggleFavorite,
-  }) : super(key: key);
+  });
 
   @override
-  State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+  State<FullScreenImageViewer> createState() =>
+      _FullScreenImageViewerState();
 }
 
-class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
-  late int currentIndex;
-
-  String extractFullPath(String proxyUrl) =>
-      Uri.parse(proxyUrl).queryParameters['path'] ?? '';
+class _FullScreenImageViewerState
+    extends State<FullScreenImageViewer> {
+  late int index;
 
   @override
   void initState() {
     super.initState();
-    currentIndex = widget.initialIndex;
+    index = widget.initialIndex;
   }
 
-  void goToNext() {
-    if (currentIndex < widget.imageUrls.length - 1) {
-      setState(() => currentIndex++);
-    }
-  }
-
-  void goToPrevious() {
-    if (currentIndex > 0) {
-      setState(() => currentIndex--);
-    }
-  }
+  String extractPath(String url) =>
+      Uri.parse(url).queryParameters['path'] ?? '';
 
   @override
   Widget build(BuildContext context) {
-    final proxyUrl = widget.imageUrls[currentIndex];
-    final fullPath = extractFullPath(proxyUrl);
-    final isFavorite = widget.favoritePaths.contains(fullPath);
+    final url = widget.imageUrls[index];
+    final path = extractPath(url);
+    final isFav = widget.favoritePaths.contains(path);
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                child: Image.network(
-                  proxyUrl,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, progress) =>
-                  progress == null
-                      ? child
-                      : const Center(child: CircularProgressIndicator()),
-                  errorBuilder: (context, error, stackTrace) =>
-                  const Center(child: Icon(Icons.error, color: Colors.red)),
-                ),
+      body: Stack(
+        children: [
+          Center(
+            child: InteractiveViewer(
+              child: Image.network(url, fit: BoxFit.contain),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            right: 20,
+            child: IconButton(
+              icon: const Icon(Icons.close,
+                  color: Colors.white, size: 30),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            left: 20,
+            child: IconButton(
+              icon: Icon(
+                isFav ? Icons.favorite : Icons.favorite_border,
+                color: isFav ? Colors.red : Colors.white,
+                size: 30,
+              ),
+              onPressed: () async {
+                await widget.onToggleFavorite(path);
+                setState(() {});
+              },
+            ),
+          ),
+          Positioned(
+            left: 10,
+            top: MediaQuery.of(context).size.height / 2,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back_ios,
+                  color: Colors.white),
+              onPressed: index > 0
+                  ? () => setState(() => index--)
+                  : null,
+            ),
+          ),
+          Positioned(
+            right: 10,
+            top: MediaQuery.of(context).size.height / 2,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_forward_ios,
+                  color: Colors.white),
+              onPressed: index < widget.imageUrls.length - 1
+                  ? () => setState(() => index++)
+                  : null,
+            ),
+          ),
+          Positioned(
+            bottom: 30,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                "${index + 1} / ${widget.imageUrls.length}",
+                style: const TextStyle(
+                    color: Colors.white70, fontSize: 16),
               ),
             ),
-            Positioned(
-              top: 30,
-              left: 20,
-              child: IconButton(
-                icon: Icon(
-                  isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: isFavorite ? Colors.red : Colors.white,
-                  size: 32,
-                ),
-                onPressed: () async {
-                  await widget.onToggleFavorite(fullPath);
-                  setState(() {}); // Refresh favorite icon state
-                },
-              ),
-            ),
-            Positioned(
-              top: 30,
-              right: 20,
-              child: IconButton(
-                icon:
-                const Icon(Icons.close, color: Colors.white, size: 32),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-            Positioned(
-              left: 20,
-              top: MediaQuery.of(context).size.height / 2 - 30,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back_ios,
-                    color: Colors.white, size: 30),
-                onPressed: goToPrevious,
-              ),
-            ),
-            Positioned(
-              right: 20,
-              top: MediaQuery.of(context).size.height / 2 - 30,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_forward_ios,
-                    color: Colors.white, size: 30),
-                onPressed: goToNext,
-              ),
-            ),
-            Positioned(
-              bottom: 30,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  '${currentIndex + 1} / ${widget.imageUrls.length}',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

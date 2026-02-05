@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:major_project_website/screens/admin_auth_pages/auth_gate.dart';
 import 'package:major_project_website/screens/landing_page_screens/qr_page/qr_scanner_page.dart';
+import 'package:major_project_website/screens/landing_page_screens/qr_page/user_choice_selection_page.dart';
 
 import '../admin_auth_pages/admin_login_page.dart';
 import '../customer_auth_pages/customer_login_page.dart';
@@ -278,7 +280,7 @@ class _HeroSectionState extends State<HeroSection>
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                          builder: (context) => QRScannerPage()),
+                                          builder: (context) => UserChoiceSelectionPage()),
                                     );
                                   },
                                   gradientColors: [
@@ -313,7 +315,7 @@ class _HeroSectionState extends State<HeroSection>
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (context) => AdminLoginPage()),
+                                      builder: (context) => AuthGate()),
                                 );
                               },
                               gradientColors: [

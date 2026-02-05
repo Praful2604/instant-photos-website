@@ -8,7 +8,7 @@ class EAlbumSection extends StatelessWidget {
   const EAlbumSection({super.key});
 
   // Define the URL for your demo album
-  final String demoAlbumUrl = 'https://instantphotos3dalbum.netlify.app/';
+  final String demoAlbumUrl = 'https://flipbook-eight-nu.vercel.app/album/277461';
 
   // Function to launch the URL
   Future<void> _launchUrl(BuildContext context, String url) async {

@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // for MediaType
+import 'package:firebase_auth/firebase_auth.dart';
 
 // Web-specific import, used only on web
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
 class FaceMatchUploadPage extends StatefulWidget {
-  const FaceMatchUploadPage({Key? key}) : super(key: key);
+  final String qrCode;
+
+  const FaceMatchUploadPage({Key? key, required this.qrCode}) : super(key: key);
 
   @override
   State<FaceMatchUploadPage> createState() => _FaceMatchUploadPageState();
@@ -22,6 +25,7 @@ class _FaceMatchUploadPageState extends State<FaceMatchUploadPage> {
   bool _isUploading = false;
   List<String> _matchedUrls = [];
   bool _hasUploaded = false;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   Future<void> _pickSelfie() async {
     if (_hasUploaded) return; // Prevent recapture after upload
@@ -51,9 +55,14 @@ class _FaceMatchUploadPageState extends State<FaceMatchUploadPage> {
       _isUploading = true;
     });
 
-    final uri = Uri.parse('http://127.0.0.1:5000/face-match');
+    final uri = Uri.parse('http://127.0.0.1:5000/face-match'); // replace with your deployed Flask URL
+
+    final user = _auth.currentUser ?? (await _auth.signInAnonymously()).user;
+    final idToken = await user!.getIdToken(true);
 
     final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $idToken'
+      ..fields['qr_code'] = widget.qrCode
       ..files.add(http.MultipartFile.fromBytes(
         'selfie',
         _selfieBytes!,

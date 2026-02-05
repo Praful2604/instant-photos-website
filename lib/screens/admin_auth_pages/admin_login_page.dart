@@ -96,7 +96,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+        MaterialPageRoute(builder: (context) =>  AdminDashboardPage()),
       );
     } on FirebaseAuthException catch (e) {
       setState(() {

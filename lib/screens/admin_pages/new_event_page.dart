@@ -14,8 +14,10 @@ class NewEventPage extends StatefulWidget {
 
 class _NewEventPageState extends State<NewEventPage> {
   final TextEditingController _eventNameController = TextEditingController();
-  String? _qrData;
-  String? _qrcode;
+
+  String? _qrCode; // numeric ID (123456)
+  String? _qrUrl;  // https://instantphotos.com/123456
+
   bool _isQRGenerated = false;
   bool _showQR = false;
   bool _isLoading = false;
@@ -23,38 +25,47 @@ class _NewEventPageState extends State<NewEventPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  /// 🌐 YOUR DOMAIN
+  static const String baseUrl = "https://instantphotos.com";
+
+  // ======================================================
+  // 🔁 SHARED LOGIC — SINGLE SOURCE OF TRUTH
+  // ======================================================
+  String buildQrUrl(String qrId) {
+    return "$baseUrl/$qrId";
+  }
+
+  // ======================================================
+  // GENERATE QR
+  // ======================================================
   void _generateQR() {
     final name = _eventNameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Event Name is required!"),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text("Event Name is required")),
       );
       return;
     }
 
-    final randomId = Random().nextInt(900000) + 100000;
+    final randomId = (Random().nextInt(900000) + 100000).toString();
 
     setState(() {
-      _qrcode = randomId.toString();
-      _qrData = "Event: $name | ID: $_qrcode";
+      _qrCode = randomId;
+      _qrUrl = buildQrUrl(randomId); // ✅ SHARED LOGIC
       _isQRGenerated = true;
       _showQR = false;
     });
 
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _showQR = true;
-        });
-      }
+      if (mounted) setState(() => _showQR = true);
     });
   }
 
-  Future<void> _saveToFirestore() async {
-    if (_qrData == null || _qrcode == null || _eventNameController.text.trim().isEmpty) return;
+  // ======================================================
+  // SAVE EVENT
+  // ======================================================
+  Future<void> _saveEvent() async {
+    if (_qrCode == null || _qrUrl == null) return;
 
     final user = _auth.currentUser;
     setState(() => _isLoading = true);
@@ -62,139 +73,141 @@ class _NewEventPageState extends State<NewEventPage> {
     try {
       await _firestore.collection('events').add({
         'name': _eventNameController.text.trim(),
-        'qr_code': _qrcode,
-        'email': user?.email ?? 'unknown',
-        'created_at': DateTime.now(),
+        'qr_code': _qrCode, // numeric
+        'qr_url': _qrUrl,   // full URL
+        'email': user?.email,
+        'created_at': Timestamp.now(),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("✅ Event saved successfully!"),
-          backgroundColor: Colors.green,
-        ),
+        const SnackBar(content: Text("✅ Event saved successfully")),
       );
 
       setState(() {
         _eventNameController.clear();
+        _qrCode = null;
+        _qrUrl = null;
         _isQRGenerated = false;
         _showQR = false;
-        _qrData = null;
-        _qrcode = null;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ Error saving event: $e"), backgroundColor: Colors.red),
+        SnackBar(content: Text("❌ Error: $e")),
       );
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
+  // ======================================================
+  // UI
+  // ======================================================
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    double buttonHeight = screenWidth > 600 ? 50 : 45;
-    double buttonWidth = screenWidth > 600 ? 200 : 150;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text("Create New Event"),
-        backgroundColor: Colors.teal,
+        backgroundColor: Colors.indigo,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            Card(
-              elevation: 5,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: TextField(
-                  controller: _eventNameController,
-                  decoration: const InputDecoration(
-                    labelText: "Event Name",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.event),
-                  ),
-                ),
+            TextField(
+              controller: _eventNameController,
+              decoration: const InputDecoration(
+                labelText: "Event Name",
+                prefixIcon: Icon(Icons.event),
+                border: OutlineInputBorder(),
               ),
             ),
+
             const SizedBox(height: 20),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.1),
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.qr_code),
-                label: const Text('Generate QR Code'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
-                  minimumSize: Size(buttonWidth, buttonHeight),
-                ),
-                onPressed: _isQRGenerated ? null : _generateQR,
+
+            ElevatedButton.icon(
+              icon: const Icon(Icons.qr_code),
+              label: const Text("Generate QR"),
+              onPressed: _isQRGenerated ? null : _generateQR,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.indigo,
               ),
             ),
+
             const SizedBox(height: 30),
+
             if (_isQRGenerated && !_showQR)
               Lottie.asset(
                 'assets/generateqr.json',
-                width: 200,
                 height: 200,
                 repeat: false,
               ),
-            if (_showQR && _qrData != null && _qrcode != null) ...[
+
+            if (_showQR && _qrUrl != null) ...[
               Card(
-                color: Colors.white,
-                elevation: 8,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                elevation: 6,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
                       const Text(
                         "Scan This QR",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
+
+                      /// ✅ QR STORES FULL URL
                       QrImageView(
-                        data: _qrData!,
-                        version: QrVersions.auto,
-                        size: 200,
+                        data: _qrUrl!,
+                        size: 220,
                         backgroundColor: Colors.white,
                       ),
+
                       const SizedBox(height: 10),
                       Text(
-                        "QR ID: $_qrcode",
+                        "QR ID: $_qrCode",
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 6),
+                      SelectableText(
+                        _qrUrl!,
+                        textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.teal,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: Colors.blue,
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 25),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.1),
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.save),
-                  label: _isLoading
-                      ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Text('Save Event'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal[700],
-                    minimumSize: Size(buttonWidth, buttonHeight),
+
+              const SizedBox(height: 20),
+
+              ElevatedButton.icon(
+                icon: _isLoading
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
                   ),
-                  onPressed: _isLoading ? null : _saveToFirestore,
+                )
+                    : const Icon(Icons.save),
+                label: const Text("Save Event"),
+                onPressed: _isLoading ? null : _saveEvent,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
                 ),
               ),
             ],

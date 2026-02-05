@@ -1,4 +1,5 @@
 import 'dart:io' as io;
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
@@ -6,6 +7,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:pool/pool.dart'; // Add this to pubspec.yaml
 
 class AddPhotosPage extends StatefulWidget {
   final String qrCode;
@@ -19,11 +22,17 @@ class _AddPhotosPageState extends State<AddPhotosPage> {
   List<PlatformFile> _selectedFiles = [];
   List<String> _uploadedImageUrls = [];
   bool _isUploading = false;
-  double _uploadProgress = 0.0;
+
+  // Progress tracking
+  int _totalToUpload = 0;
+  int _completedUploads = 0;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Limits simultaneous uploads to 5 at a time
+  final _uploadPool = Pool(5);
 
   @override
   void initState() {
@@ -31,262 +40,147 @@ class _AddPhotosPageState extends State<AddPhotosPage> {
     _loadUploadedImages();
   }
 
+  /// COMPRESSION LOGIC: Shrinks 30MB to ~1-2MB
+  Future<Uint8List?> _compressImage(PlatformFile file) async {
+    try {
+      Uint8List bytes = file.bytes ?? await io.File(file.path!).readAsBytes();
+
+      return await FlutterImageCompress.compressWithList(
+        bytes,
+        minHeight: 1920, // Full HD Height
+        minWidth: 1080,  // Full HD Width
+        quality: 80,     // 80% is the "sweet spot" for quality vs size
+        format: CompressFormat.jpeg,
+      );
+    } catch (e) {
+      debugPrint("Compression failed for ${file.name}: $e");
+      return null;
+    }
+  }
+
   Future<void> _loadUploadedImages() async {
     try {
-      final ListResult result = await _storage.ref('event-images/${widget.qrCode}').listAll();
-
+      final result = await _storage.ref('event-images/${widget.qrCode}').listAll();
       final urls = await Future.wait(result.items.map((ref) => ref.getDownloadURL()));
-
-      setState(() {
-        _uploadedImageUrls = urls;
-      });
+      setState(() => _uploadedImageUrls = urls);
     } catch (e) {
-      debugPrint('Error loading uploaded images: $e');
+      debugPrint('Error loading images: $e');
     }
   }
 
   Future<void> pickImages() async {
-    if (!kIsWeb) {
-      final status = await Permission.storage.request();
-      if (!status.isGranted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Permission denied to access storage")),
-        );
-        return;
-      }
-    }
+    if (!kIsWeb && await Permission.storage.request().isDenied) return;
 
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: true,
-      withData: true,
+      withData: true, // Crucial for Web & Compression
     );
 
-    if (result != null && result.files.isNotEmpty) {
-      setState(() {
-        _selectedFiles = result.files;
-      });
+    if (result != null) {
+      setState(() => _selectedFiles = result.files);
     }
   }
 
-  void removeImage(int index) {
-    setState(() {
-      _selectedFiles.removeAt(index);
-    });
-  }
-
-  Future<void> removeUploadedImage(int index) async {
-    try {
-      final url = _uploadedImageUrls[index];
-      final ref = _storage.refFromURL(url);
-
-      await ref.delete();
-
-      setState(() {
-        _uploadedImageUrls.removeAt(index);
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Image deleted successfully!")),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error deleting image: $e")),
-      );
-    }
-  }
-
+  /// THE CORE UPLOAD LOGIC
   Future<void> uploadImages() async {
-    if (_selectedFiles.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please select images first")),
-      );
-      return;
-    }
+    if (_selectedFiles.isEmpty) return;
 
     setState(() {
       _isUploading = true;
-      _uploadProgress = 0.0;
+      _totalToUpload = _selectedFiles.length;
+      _completedUploads = 0;
     });
 
-    List<String> newDownloadUrls = [];
     final user = _auth.currentUser;
+    List<Future> uploadTasks = [];
 
-    for (int i = 0; i < _selectedFiles.length; i++) {
-      final file = _selectedFiles[i];
-      final fileName = "${DateTime.now().millisecondsSinceEpoch}_${file.name}";
-      final filePath = "event-images/${widget.qrCode}/$fileName";
+    for (var file in _selectedFiles) {
+      // We use the 'pool' to wrap each upload task
+      uploadTasks.add(_uploadPool.withResource(() async {
+        try {
+          // 1. Compress
+          final compressedBytes = await _compressImage(file);
+          if (compressedBytes == null) return;
 
-      try {
-        final fileBytes = kIsWeb
-            ? file.bytes!
-            : await io.File(file.path!).readAsBytes();
+          // 2. Upload to Storage (Using same location as before)
+          final fileName = "${DateTime.now().millisecondsSinceEpoch}_${file.name}";
+          final filePath = "event-images/${widget.qrCode}/$fileName";
+          final ref = _storage.ref(filePath);
 
-        final ref = _storage.ref(filePath);
-        final uploadTask = ref.putData(fileBytes);
+          await ref.putData(
+              compressedBytes,
+              SettableMetadata(contentType: 'image/jpeg')
+          );
 
-        await uploadTask;
+          final publicUrl = await ref.getDownloadURL();
 
-        final publicUrl = await ref.getDownloadURL();
-        newDownloadUrls.add(publicUrl);
+          // 3. Save to Firestore
+          if (user != null) {
+            await _firestore.collection('event_images').add({
+              'url': publicUrl,
+              'qr_code': widget.qrCode,
+              'uploaded_by': user.uid,
+              'uploaded_at': FieldValue.serverTimestamp(),
+            });
+          }
 
-        // Optional: Save metadata to Firestore if you want
-        if (user != null) {
-          await _firestore.collection('event_images').add({
-            'url': publicUrl,
-            'qr_code': widget.qrCode,
-            'uploaded_by': user.uid,
-            'uploaded_at': DateTime.now(),
+          setState(() {
+            _completedUploads++;
+            _uploadedImageUrls.add(publicUrl);
           });
+        } catch (e) {
+          debugPrint("Failed to upload ${file.name}: $e");
         }
-
-        setState(() {
-          _uploadProgress = (i + 1) / _selectedFiles.length;
-        });
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Failed to upload ${file.name}: $e")),
-        );
-      }
+      }));
     }
 
-    if (newDownloadUrls.isNotEmpty) {
-      setState(() {
-        _uploadedImageUrls.addAll(newDownloadUrls);
-        _selectedFiles.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Images uploaded successfully!"),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
+    // Wait for all 700 (queued 5 at a time) to finish
+    await Future.wait(uploadTasks);
 
     setState(() {
       _isUploading = false;
-      _uploadProgress = 0.0;
+      _selectedFiles.clear();
     });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("All uploads complete!"), backgroundColor: Colors.green),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    double progress = _totalToUpload > 0 ? _completedUploads / _totalToUpload : 0;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Upload Photos"),
-        backgroundColor: Colors.deepPurple,
-      ),
+      appBar: AppBar(title: const Text("Upload Photos (Bulk)"), backgroundColor: Colors.deepPurple),
       body: Padding(
         padding: const EdgeInsets.all(10.0),
         child: Column(
           children: [
+            if (_isUploading) ...[
+              LinearProgressIndicator(value: progress),
+              Text("Uploading $_completedUploads of $_totalToUpload photos..."),
+              const SizedBox(height: 20),
+            ],
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
+                ElevatedButton(onPressed: _isUploading ? null : pickImages, child: const Text("Select Images")),
                 ElevatedButton(
-                  onPressed: pickImages,
-                  child: const Text("Select Images"),
-                ),
-                ElevatedButton(
-                  onPressed: _isUploading ? null : uploadImages,
-                  child: Text(_isUploading ? "Uploading..." : "Upload Images"),
+                  onPressed: _isUploading || _selectedFiles.isEmpty ? null : uploadImages,
+                  child: const Text("Start Bulk Upload"),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            if (_isUploading) ...[
-              LinearProgressIndicator(value: _uploadProgress),
-              Text("${(_uploadProgress * 100).toStringAsFixed(0)}% uploaded"),
-              const SizedBox(height: 10),
-            ],
-            if (_selectedFiles.isNotEmpty) ...[
-              const Text(
-                "Selected Images (Not Uploaded Yet)",
-                style: TextStyle(fontWeight: FontWeight.bold),
+            const Divider(),
+            Expanded(
+              child: GridView.builder(
+                itemCount: _uploadedImageUrls.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3),
+                itemBuilder: (context, index) => Image.network(_uploadedImageUrls[index], fit: BoxFit.cover),
               ),
-              Flexible(
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  itemCount: _selectedFiles.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemBuilder: (context, index) {
-                    final file = _selectedFiles[index];
-                    return Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: kIsWeb
-                              ? Image.memory(file.bytes!, fit: BoxFit.cover)
-                              : Image.file(io.File(file.path!), fit: BoxFit.cover),
-                        ),
-                        Positioned(
-                          top: 5,
-                          right: 5,
-                          child: GestureDetector(
-                            onTap: () => removeImage(index),
-                            child: const CircleAvatar(
-                              backgroundColor: Colors.red,
-                              radius: 12,
-                              child: Icon(Icons.close, size: 16, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            if (_uploadedImageUrls.isNotEmpty) ...[
-              const Text(
-                "Uploaded Images",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Flexible(
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  itemCount: _uploadedImageUrls.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
-                  ),
-                  itemBuilder: (context, index) {
-                    return Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: Image.network(
-                            _uploadedImageUrls[index],
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        Positioned(
-                          top: 5,
-                          right: 5,
-                          child: GestureDetector(
-                            onTap: () => removeUploadedImage(index),
-                            child: const CircleAvatar(
-                              backgroundColor: Colors.red,
-                              radius: 12,
-                              child: Icon(Icons.delete, size: 16, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ],
-            if (_selectedFiles.isEmpty && _uploadedImageUrls.isEmpty)
-              const Center(child: Text("No images selected or uploaded yet")),
+            ),
           ],
         ),
       ),

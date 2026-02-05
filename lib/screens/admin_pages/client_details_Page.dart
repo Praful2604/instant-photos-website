@@ -107,12 +107,7 @@ class _ClientDetailsPageState extends State<ClientDetailsPage> {
             padding: const EdgeInsets.all(25),
             child: Column(
               children: [
-                QrImageView(
-                  data: widget.qrCode,
-                  size: 180,
-                  backgroundColor: Colors.white,
-                ),
-                const SizedBox(height: 15),
+
                 Text(
                   widget.qrCode,
                   style: const TextStyle(

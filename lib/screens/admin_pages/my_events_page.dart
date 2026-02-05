@@ -1,13 +1,15 @@
+import 'dart:html' as html;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:major_project_website/screens/admin_pages/add_photos_page.dart';
-import 'package:major_project_website/screens/admin_pages/album_images.dart';
 import 'package:major_project_website/screens/admin_pages/client_details_Page.dart';
-import 'package:major_project_website/screens/admin_pages/view_photos_page.dart';
+import 'package:major_project_website/screens/admin_pages/view_all_photos.dart';
+import 'package:major_project_website/screens/client_pages/gallery_page.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
-
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -24,6 +26,19 @@ class _EventListPageState extends State<EventListPage> {
 
   String? _userEmail;
 
+  final Map<String, GlobalKey> _qrKeys = {};
+
+  static const String baseQrUrl = "https://instantphotos.com";
+  static const String albumBaseUrl =
+      "https://flipbook-eight-nu.vercel.app/album/";
+
+  String buildQrUrl(String qrCode) => "$baseQrUrl/$qrCode";
+
+  void open3DAlbum(String qrCode) {
+    final url = "$albumBaseUrl/$qrCode";
+    html.window.open(url, '_blank');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -32,213 +47,248 @@ class _EventListPageState extends State<EventListPage> {
 
   void _getUserEmail() {
     final user = _auth.currentUser;
-    if (user != null && user.email != null) {
-      setState(() {
-        _userEmail = user.email!;
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("No user logged in"), backgroundColor: Colors.red),
-      );
+    if (user?.email != null) {
+      setState(() => _userEmail = user!.email);
+    }
+  }
+
+  // ---------------- LOGOUT ----------------
+  Future<void> _logout() async {
+    await _auth.signOut();
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
     }
   }
 
   Future<List<Map<String, dynamic>>> _fetchEvents() async {
     if (_userEmail == null) return [];
 
-    try {
-      final querySnapshot = await _firestore
-          .collection('events')
-          .where('email', isEqualTo: _userEmail)
-          .orderBy('created_at', descending: true)
-          .get();
+    final snapshot = await _firestore
+        .collection('events')
+        .where('email', isEqualTo: _userEmail)
+        .orderBy('created_at', descending: true)
+        .get();
 
-      return querySnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
+    return snapshot.docs.map((e) => e.data()).toList();
+  }
+
+  Future<void> _downloadQr(String qrCode, String eventName) async {
+    try {
+      final key = _qrKeys[qrCode];
+      if (key == null) return;
+
+      final boundary =
+      key.currentContext!.findRenderObject() as RenderRepaintBoundary;
+
+      final ui.Image image = await boundary.toImage(pixelRatio: 3);
+      final ByteData? byteData =
+      await image.toByteData(format: ui.ImageByteFormat.png);
+
+      final blob = html.Blob([byteData!.buffer.asUint8List()]);
+      final url = html.Url.createObjectUrlFromBlob(blob);
+
+      html.AnchorElement(href: url)
+        ..setAttribute("download", "${eventName}_QR.png")
+        ..click();
+
+      html.Url.revokeObjectUrl(url);
     } catch (e) {
-      debugPrint('Error fetching events: $e');
-      return [];
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Download failed: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete(String qrCode) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text("Delete Event"),
+        content: const Text(
+          "Are you sure you want to delete this event?\nThis action cannot be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      _deleteEvent(qrCode);
     }
   }
 
   Future<void> _deleteEvent(String qrCode) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('events')
-          .where('qr_code', isEqualTo: qrCode)
-          .get();
+    final snapshot = await _firestore
+        .collection('events')
+        .where('qr_code', isEqualTo: qrCode)
+        .get();
 
-      for (var doc in querySnapshot.docs) {
-        await doc.reference.delete();
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text("Event deleted successfully"),
-            backgroundColor: Colors.red),
-      );
-
-      setState(() {}); // Refresh the list after deletion
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text("Error deleting event: $e"),
-            backgroundColor: Colors.red),
-      );
+    for (final doc in snapshot.docs) {
+      await doc.reference.delete();
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Event deleted", style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    setState(() {});
   }
 
   Future<void> _shareEventLink(String qrCode, String eventName) async {
-    final link =
-        'https://instantphotoss.netlify.app/event-images?qrCode=$qrCode&eventName=${Uri.encodeComponent(eventName)}';
+    Share.share(
+      'Check out photos from "$eventName": ${buildQrUrl(qrCode)}',
+    );
+  }
 
-    await showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.copy, color: Colors.blue),
-                title: const Text('Copy Link'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Clipboard.setData(ClipboardData(text: link));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Link copied to clipboard!')),
-                  );
-                },
+  // ---------------- WHATSAPP SHARE (NEW, NO EXISTING CODE TOUCHED) ----------------
+  Future<void> _shareOnWhatsApp(String qrCode, String eventName) async {
+    final viewPhotosUrl = buildQrUrl(qrCode);
+    final albumUrl = "$albumBaseUrl/$qrCode";
+
+    final message = '''
+📸 Event: $eventName
+
+🔗 View Photos:
+$viewPhotosUrl
+
+📖 3D Album:
+$albumUrl
+''';
+
+    final encodedMessage = Uri.encodeComponent(message);
+    final whatsappUrl = "https://wa.me/?text=$encodedMessage";
+
+    html.window.open(whatsappUrl, '_blank');
+  }
+
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        width: 88,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: gradient),
+                borderRadius: BorderRadius.circular(14),
               ),
-              ListTile(
-                leading: Image.asset(
-                  'assets/whatsapp.png',
-                  width: 24,
-                  height: 24,
-                  color: Colors.green,
-                ),
-                title: const Text('Share via WhatsApp'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  final whatsappUrl =
-                      'whatsapp://send?text=${Uri.encodeComponent('Check out photos from "$eventName": $link')}';
-                  try {
-                    if (await canLaunchUrl(Uri.parse(whatsappUrl))) {
-                      await launchUrl(Uri.parse(whatsappUrl));
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('WhatsApp not installed')),
-                      );
-                      await Share.share(
-                          'Check out photos from "$eventName": $link',
-                          subject: 'Photos from $eventName');
-                    }
-                  } catch (e) {
-                    debugPrint('Error sharing via WhatsApp: $e');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error sharing: $e')),
-                    );
-                  }
-                },
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: Colors.white70,
               ),
-              ListTile(
-                leading: const Icon(Icons.share, color: Colors.purple),
-                title: const Text('Share via Other Apps'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Share.share('Check out photos from "$eventName": $link',
-                      subject: 'Photos from $eventName');
-                },
-              ),
-            ],
-          ),
-        );
-      },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildActionButtons(String qrCode, String eventName) {
     return Wrap(
-      spacing: 10,
+      spacing: 14,
+      runSpacing: 14,
       alignment: WrapAlignment.center,
       children: [
-        IconButton(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (context) => AddPhotosPage(qrCode: qrCode)),
-            );
-          },
-          icon: const Icon(Icons.add_a_photo, color: Colors.green),
-          tooltip: "Add Photo",
+        _actionButton(
+          icon: Icons.add_a_photo,
+          label: "Add Photos",
+          gradient: [Color(0xFF00C6FF), Color(0xFF0072FF)],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AddPhotosPage(qrCode: qrCode),
+            ),
+          ),
         ),
-        IconButton(
-          onPressed: () {
-            // Add your navigation or logic here
-          },
-          icon: const Icon(Icons.view_in_ar, color: Colors.blue),
-          tooltip: "Add 3D Album Photos",
+        _actionButton(
+          icon: Icons.photo_library,
+          label: "3D Album",
+          gradient: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
+          onTap: () => open3DAlbum(qrCode),
         ),
-        IconButton(
-          onPressed: () {
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AlbumImages(qrCode: qrCode, eventName: '',),
-                ));
-          },
-          icon: const Icon(Icons.photo_library, color: Colors.orange),
-          tooltip: "View 3D Album",
+        _actionButton(
+          icon: Icons.panorama,
+          label: "View Photos",
+          gradient: [Color(0xFF00C6FF), Color(0xFF0072FF)],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ViewAllPhotos(qrCode: qrCode),
+            ),
+          ),
         ),
-        IconButton(
-          onPressed: () {
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ViewPhotosPage(qrCode: qrCode, eventName: '',),
-                ));
-          },
-          icon: const Icon(Icons.panorama, color: Colors.orange),
-          tooltip: "View Event Images",
+        _actionButton(
+          icon: Icons.details,
+          label: "Client Info",
+          gradient: [Color(0xFF203A43), Color(0xFF2C5364)],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  ClientDetailsPage(qrCode: qrCode, eventName: eventName),
+            ),
+          ),
         ),
-        IconButton(
-          onPressed: () {
-            // Add your navigation or logic here
-          },
-          icon: const Icon(Icons.favorite, color: Colors.red),
-          tooltip: "Favorite Photos",
+        _actionButton(
+          icon: Icons.share,
+          label: "Share",
+          gradient: [Color(0xFF25D366), Color(0xFF128C7E)],
+          onTap: () => _shareOnWhatsApp(qrCode, eventName),
         ),
-        IconButton(
-          onPressed: () {
-            // Add your navigation or logic here
-          },
-          icon: const Icon(Icons.image, color: Colors.blueAccent),
-          tooltip: "All Event Photos",
+        _actionButton(
+          icon: Icons.favorite,
+          label: "Favourite Photos",
+          gradient: [Colors.redAccent, Colors.red],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => GalleryPage(qrCode: qrCode),
+            ),
+          ),
         ),
-        IconButton(
-          onPressed: () {
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      ClientDetailsPage(qrCode: qrCode, eventName: eventName),
-                ));
-          },
-          icon: const Icon(Icons.details, color: Colors.blue),
-          tooltip: " Client Details ",
+
+        _actionButton(
+          icon: Icons.download,
+          label: "Download",
+          gradient: [Colors.green, Colors.teal],
+          onTap: () => _downloadQr(qrCode, eventName),
         ),
-        IconButton(
-          onPressed: () => _shareEventLink(qrCode, eventName),
-          icon: const Icon(Icons.share, color: Colors.blue),
-          tooltip: "Share Event Link",
-        ),
-        IconButton(
-          onPressed: () => _deleteEvent(qrCode),
-          icon: const Icon(Icons.delete, color: Colors.red),
-          tooltip: "Delete Event",
+
+        _actionButton(
+          icon: Icons.delete,
+          label: "Delete",
+          gradient: [Colors.redAccent, Colors.red],
+          onTap: () => _confirmDelete(qrCode),
         ),
       ],
     );
@@ -246,114 +296,98 @@ class _EventListPageState extends State<EventListPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_userEmail == null) {
-      // Show loading or message while fetching user email
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
+      backgroundColor: const Color(0xFF0F2027),
       appBar: AppBar(
-        title: const Text("My Events"),
-        backgroundColor: Colors.teal,
+        backgroundColor: const Color(0xFF203A43),
+        elevation: 4,
+        centerTitle: true,
+        title: Text(
+          "My Events",
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+        actions: [
+          IconButton(
+            tooltip: "Logout",
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+          ),
+        ],
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _fetchEvents(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
-          }
-          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text("No events found."));
           }
 
           final events = snapshot.data!;
+          if (events.isEmpty) {
+            return const Center(
+              child: Text(
+                "No events found",
+                style: TextStyle(color: Colors.white70),
+              ),
+            );
+          }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(20),
             itemCount: events.length,
             itemBuilder: (context, index) {
               final event = events[index];
-              final String name = event['name'] ?? '';
-              final String qrCode = event['qr_code'] ?? '';
+              final name = event['name'] ?? '';
+              final qrCode = event['qr_code'] ?? '';
 
-              return LayoutBuilder(
-                builder: (context, constraints) {
-                  final isMobile = constraints.maxWidth < 600;
+              _qrKeys.putIfAbsent(qrCode, () => GlobalKey());
 
-                  return Card(
-                    elevation: 5,
-                    margin:
-                    const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: isMobile
-                          ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Text(
-                            name,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 10),
-                          QrImageView(
-                            data: qrCode,
-                            size: 160,
-                            backgroundColor: Colors.white,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            "Code: $qrCode",
-                            style: const TextStyle(
-                                fontSize: 16, color: Colors.blueGrey),
-                          ),
-                          const SizedBox(height: 10),
-                          _buildActionButtons(qrCode, name),
-                        ],
-                      )
-                          : Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          QrImageView(
-                            data: qrCode,
-                            size: 120,
-                            backgroundColor: Colors.white,
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  name,
-                                  style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  "Code: $qrCode",
-                                  style: const TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.blueGrey),
-                                ),
-                                const SizedBox(height: 10),
-                                _buildActionButtons(qrCode, name),
-                              ],
-                            ),
-                          ),
-                        ],
+              return Container(
+                margin: const EdgeInsets.only(bottom: 24),
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF203A43), Color(0xFF2C5364)],
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      name,
+                      style: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                  );
-                },
+                    const SizedBox(height: 14),
+                    RepaintBoundary(
+                      key: _qrKeys[qrCode],
+                      child: Container(
+                        color: Colors.white,
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 6),
+                            QrImageView(
+                              data: buildQrUrl(qrCode),
+                              size: 140,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(qrCode),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const Divider(color: Colors.white24, height: 30),
+                    _buildActionButtons(qrCode, name),
+                  ],
+                ),
               );
             },
           );

@@ -1,3 +1,5 @@
+/*
+
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:major_project_website/screens/landing_page_screens/hero_section.dart';
@@ -498,3 +500,4 @@ class _QRScannerPageState extends State<QRScannerPage>
     );
   }
 }
+*/

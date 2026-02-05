@@ -1,216 +1,270 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
+import '../admin_auth_pages/admin_details.dart';
 import 'my_events_page.dart';
 import 'new_event_page.dart';
 
-
 class AdminDashboardPage extends StatefulWidget {
-  const AdminDashboardPage({super.key});
+  const AdminDashboardPage({Key? key}) : super(key: key);
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
 }
 
 class _AdminDashboardPageState extends State<AdminDashboardPage> {
-  bool _isExpanded = false;
+  final user = FirebaseAuth.instance.currentUser!;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Future<int> _getEventCount() async {
+    final snapshot = await _firestore
+        .collection('events')
+        .where('email', isEqualTo: user.email)
+        .get();
+    return snapshot.docs.length;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
-        title: const Text("Admin Dashboard"),
-        backgroundColor: Colors.blueAccent,
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Colors.blue, Colors.purple],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          "Dashboard",
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Welcome Section
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Colors.blue, Colors.purple],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Text(
-                    "Welcome Admin!",
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
 
-              // Manage Events Section
-              AnimatedContainer(
-                duration: const Duration(seconds: 1),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.blueAccent, Colors.blue.shade200],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
+            /// ---------- HEADER ----------
+            Text(
+              "Welcome back 👋",
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              user.email ?? "",
+              style: const TextStyle(
+                fontSize: 13,
+                color: Colors.grey,
+              ),
+            ),
+
+            const SizedBox(height: 22),
+
+            /// ---------- STATS CARD ----------
+            FutureBuilder<int>(
+              future: _getEventCount(),
+              builder: (context, snapshot) {
+                final count = snapshot.data ?? 0;
+
+                return Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF7F00FF),
+                        Color(0xFFE100FF),
+                      ],
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _isExpanded = !_isExpanded;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.purple.withOpacity(0.35),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(8),
-                          color: Colors.white,
+                          color: Colors.white.withOpacity(0.18),
+                          shape: BoxShape.circle,
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _isExpanded ? Icons.remove : Icons.add,
-                              color: Colors.blue,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              "Manage Events",
-                              style: Theme.of(context).textTheme.titleMedium,
-                            ),
-                          ],
+                        child: const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.white,
+                          size: 30,
                         ),
                       ),
-                    ),
-
-                    // Expanded content
-                    AnimatedSize(
-                      duration: const Duration(seconds: 1),
-                      curve: Curves.easeInOut,
-                      child: _isExpanded
-                          ? Column(
+                      const SizedBox(width: 18),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 16),
-                          _buildSectionTitle("Create New Event"),
-                          _buildSimpleBox(
-                            title: "Create New Event",
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                    const NewEventPage()),
-                              );
-                            },
+                          const Text(
+                            "EVENTS CREATED",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              letterSpacing: 1.2,
+                            ),
                           ),
-                          const SizedBox(height: 24),
-                          _buildSectionTitle("View My Events"),
-                          _buildSimpleBox(
-                            title: "View All Events",
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                    const EventListPage()),
-                              );
-                            },
+                          const SizedBox(height: 6),
+                          Text(
+                            "$count",
+                            style: const TextStyle(
+                              fontSize: 34,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
-                      )
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
 
-  // Section Title Widget
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
+            const SizedBox(height: 30),
 
-  // Simple clickable box with square container format
-  Widget _buildSimpleBox({
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Container(
-        width: MediaQuery.of(context).size.width / 2 - 32,
-        height: 150,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 6,
-              offset: Offset(0, 2),
+            /// ---------- ACTION CARDS ----------
+            _premiumCard(
+              icon: Icons.add_circle_rounded,
+              title: "Create Event",
+              subtitle: "Generate QR & upload photos",
+              color: Colors.green,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const NewEventPage(),
+                  ),
+                );
+              },
+            ),
+
+            _premiumCard(
+              icon: Icons.collections_bookmark_rounded,
+              title: "My Events",
+              subtitle: "View & manage your events",
+              color: Colors.blue,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const EventListPage(),
+                  ),
+                );
+              },
+            ),
+
+            _premiumCard(
+              icon: Icons.person_rounded,
+              title: "Admin Profile",
+              subtitle: "View your account details",
+              color: Colors.deepPurple,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AdminDetailsPage(),
+                  ),
+                );
+              },
             ),
           ],
         ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                const Icon(Icons.event, color: Colors.red, size: 30),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueAccent,
-                    ),
-                  ),
-                ),
+      ),
+    );
+  }
+
+  /// ---------- PREMIUM CARD ----------
+  Widget _premiumCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        splashColor: color.withOpacity(0.15),
+        highlightColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: LinearGradient(
+              colors: [
+                Colors.white,
+                color.withOpacity(0.05),
               ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      color.withOpacity(0.25),
+                      color.withOpacity(0.1),
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 30),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: Colors.grey,
+              ),
+            ],
           ),
         ),
       ),
