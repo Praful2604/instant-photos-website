@@ -2,11 +2,14 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:major_project_website/screens/landing_page_screens/qr_page/face_match_upload_selfie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../customer_auth_pages/customer_login_page.dart';
 import '../../admin_pages/view_photos_page.dart';
+import '../../client_pages/gallery_page.dart';
 import '../home_page.dart';
 
 class UserChoiceSelectionPage extends StatefulWidget {
@@ -23,6 +26,7 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage>
 
   bool _isAuthenticated = false;
   bool _isCheckingAuth = true;
+  bool _isClientLoading = false;
 
   late AnimationController _animationController;
   late Animation<double> _fadeScale;
@@ -77,6 +81,44 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage>
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
       );
+    }
+  }
+
+  Future<void> _openClientGallery() async {
+    final email = _auth.currentUser?.email;
+    if (email == null) return;
+
+    setState(() => _isClientLoading = true);
+
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('client_details')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (!mounted) return;
+
+      if (query.docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Access denied. No client record found for your account.'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+
+      final qrCode = query.docs.first.data()['qrCode'] as String? ?? '';
+      final eventName = query.docs.first.data()['eventName'] as String? ?? '';
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => GalleryPage(qrCode: qrCode, eventName: eventName)),
+      );
+    } finally {
+      if (mounted) setState(() => _isClientLoading = false);
     }
   }
 
@@ -184,7 +226,8 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage>
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const ViewPhotosPage(),
+                     builder: (_) => const ViewPhotosPage(),
+
                     ),
                   );
                 },
@@ -202,6 +245,17 @@ class _UserChoiceSelectionPageState extends State<UserChoiceSelectionPage>
                   );
                 },
               ),
+              const SizedBox(height: 18),
+              _isClientLoading
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : _gradientButton(
+                      title: 'Login as Client',
+                      icon: Icons.person_pin_rounded,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF11998e), Color(0xFF38ef7d)],
+                      ),
+                      onPressed: _openClientGallery,
+                    ),
             ],
           ),
         ),

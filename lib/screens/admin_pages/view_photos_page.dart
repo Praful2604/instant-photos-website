@@ -25,8 +25,7 @@ class _ViewPhotosPageState extends State<ViewPhotosPage>
   bool isMatching = false;
   List<String> matchedImageUrls = [];
 
-  final String backendBaseUrl = "http://10.50.42.30:5000";
-
+  final String backendBaseUrl = "http://127.0.0.1:8000";
   late AnimationController _fabController;
 
   @override

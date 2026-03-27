@@ -91,7 +91,7 @@ class _UploadSelfiePageState extends State<UploadSelfiePage> {
 
     try {
       final response = await http.post(
-        Uri.parse('http:///10.158.10.8:5000/save-selfie'),
+        Uri.parse('http:/// 10.123.62.8:5000/save-selfie'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'selfie_url': _uploadedUrl}),
       );

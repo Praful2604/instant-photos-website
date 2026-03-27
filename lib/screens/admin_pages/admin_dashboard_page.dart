@@ -3,8 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../admin_auth_pages/admin_details.dart';
+import '../admin_auth_pages/admin_login_page.dart';
+import '../admin_auth_pages/admin_login_page.dart';
 import 'my_events_page.dart';
 import 'new_event_page.dart';
+import 'subscription_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({Key? key}) : super(key: key);
@@ -17,18 +20,26 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   final user = FirebaseAuth.instance.currentUser!;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Future<int> _getEventCount() async {
-    final snapshot = await _firestore
+  Future<Map<String, int>> _getEventStats() async {
+    final eventsSnap = await _firestore
         .collection('events')
         .where('email', isEqualTo: user.email)
         .get();
-    return snapshot.docs.length;
+    final usedCount = eventsSnap.docs.length;
+
+    final subDoc = await _firestore
+        .collection('subscriptions')
+        .doc(user.email)
+        .get();
+    final totalQuota = (subDoc.data()?['total_quota'] ?? 2) as int;
+
+    return {'used': usedCount, 'quota': totalQuota};
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
+      backgroundColor: const Color(0xFF1A1A2E),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -36,11 +47,52 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         title: const Text(
           "Dashboard",
           style: TextStyle(
-            color: Colors.black,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
           ),
         ),
-        iconTheme: const IconThemeData(color: Colors.black),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF7F00FF), Color(0xFFE100FF)],
+            ),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.white),
+            tooltip: 'Logout',
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  title: const Text('Logout'),
+                  content: const Text('Are you sure you want to logout?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('Logout', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const AdminLoginPage()),
+                    (_) => false,
+                  );
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -50,9 +102,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
             /// ---------- HEADER ----------
             Text(
-              "Welcome back 👋",
+              "Welcome back ",
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w700,
+                color: Colors.white,
               ),
             ),
             const SizedBox(height: 4),
@@ -60,27 +113,27 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               user.email ?? "",
               style: const TextStyle(
                 fontSize: 13,
-                color: Colors.grey,
+                color: Colors.white54,
               ),
             ),
 
             const SizedBox(height: 22),
 
             /// ---------- STATS CARD ----------
-            FutureBuilder<int>(
-              future: _getEventCount(),
+            FutureBuilder<Map<String, int>>(
+              future: _getEventStats(),
               builder: (context, snapshot) {
-                final count = snapshot.data ?? 0;
+                final used = snapshot.data?['used'] ?? 0;
+                final quota = snapshot.data?['quota'] ?? 2;
+                final remaining = quota - used;
+                final pct = quota == 0 ? 0.0 : (used / quota).clamp(0.0, 1.0);
 
                 return Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     gradient: const LinearGradient(
-                      colors: [
-                        Color(0xFF7F00FF),
-                        Color(0xFFE100FF),
-                      ],
+                      colors: [Color(0xFF7F00FF), Color(0xFFE100FF)],
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -90,42 +143,60 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.auto_awesome,
-                          color: Colors.white,
-                          size: 30,
-                        ),
-                      ),
-                      const SizedBox(width: 18),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Row(
                         children: [
-                          const Text(
-                            "EVENTS CREATED",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              letterSpacing: 1.2,
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              shape: BoxShape.circle,
                             ),
+                            child: const Icon(Icons.auto_awesome,
+                                color: Colors.white, size: 30),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            "$count",
-                            style: const TextStyle(
-                              fontSize: 34,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          const SizedBox(width: 18),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('EVENTS CREATED',
+                                  style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                      letterSpacing: 1.2)),
+                              const SizedBox(height: 4),
+                              Text('$used / $quota',
+                                  style: const TextStyle(
+                                      fontSize: 32,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold)),
+                            ],
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 14),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 7,
+                          backgroundColor: Colors.white24,
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        remaining > 0
+                            ? '$remaining event${remaining > 1 ? 's' : ''} remaining'
+                            : 'Quota full — upgrade to create more',
+                        style: TextStyle(
+                            color: remaining > 0
+                                ? Colors.white70
+                                : Colors.yellowAccent,
+                            fontSize: 12),
                       ),
                     ],
                   ),
@@ -180,6 +251,21 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                 );
               },
             ),
+
+            _premiumCard(
+              icon: Icons.workspace_premium_rounded,
+              title: "Subscription Plans",
+              subtitle: "Buy more events & manage quota",
+              color: Colors.orange,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SubscriptionPage(),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
@@ -205,17 +291,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-              colors: [
-                Colors.white,
-                color.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: const Color(0xFF16213E),
             boxShadow: const [
               BoxShadow(
-                color: Colors.black12,
+                color: Colors.black45,
                 blurRadius: 18,
                 offset: Offset(0, 8),
               ),
@@ -246,6 +325,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -253,7 +333,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       subtitle,
                       style: const TextStyle(
                         fontSize: 13,
-                        color: Colors.grey,
+                        color: Colors.white54,
                       ),
                     ),
                   ],
@@ -262,7 +342,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               const Icon(
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
-                color: Colors.grey,
+                color: Colors.white54,
               ),
             ],
           ),

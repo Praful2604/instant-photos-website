@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 class GalleryPage extends StatefulWidget {
   final String qrCode;
-  const GalleryPage({Key? key, required this.qrCode}) : super(key: key);
+  final String eventName;
+  const GalleryPage({Key? key, required this.qrCode, this.eventName = ''}) : super(key: key);
 
   @override
   State<GalleryPage> createState() => _GalleryPageState();
@@ -103,13 +104,24 @@ class _GalleryPageState extends State<GalleryPage>
     return Scaffold(
       backgroundColor: const Color(0xFF0F2027),
       appBar: AppBar(
-        title: const Text("Gallery"),
+        title: Text(widget.eventName.isNotEmpty ? widget.eventName : "Gallery"),
         centerTitle: true,
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF7F00FF), Color(0xFFE100FF)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.cyanAccent,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           tabs: const [
             Tab(icon: Icon(Icons.photo), text: "All Photos"),
             Tab(icon: Icon(Icons.favorite), text: "Favorites"),

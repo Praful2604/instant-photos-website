@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:major_project_website/screens/landing_page_screens/subscription_info_page.dart';
 import 'about.dart';
 import 'call_to_action_section.dart';
 import 'e_album_section.dart';
@@ -31,6 +32,8 @@ class _HomePageState extends State<HomePage> {
   final aboutKey = GlobalKey();
   final faqKey = GlobalKey();
   final benefitsKey = GlobalKey();
+  final subKey = GlobalKey();
+
 
   bool isScrolled = false;
   bool showHelp = false;
@@ -122,7 +125,12 @@ class _HomePageState extends State<HomePage> {
                 EAlbumSection(key: ealbumKey),
                 CallToActionSection(key: ctaKey),
                 TestimonialSection(key: testimonialKey),
+                Divider(),
+                SubscriptionInfoPage(key: subKey,),
                 FooterSection(key: footerKey),
+
+
+
               ],
             ),
           ),
@@ -255,6 +263,7 @@ class _HomePageState extends State<HomePage> {
       _navButton('About', () => scrollToSection(aboutKey, isMobile), isMobile),
       _navButton(
           'E-Album', () => scrollToSection(ealbumKey, isMobile), isMobile),
+
       _navButton('Contact', () => scrollToSection(ctaKey, isMobile), isMobile),
       const SizedBox(width: 20),
     ];

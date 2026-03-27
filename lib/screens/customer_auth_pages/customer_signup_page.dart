@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -72,7 +73,16 @@ class _CustomerSignUpPageState extends State<CustomerSignUpPage> with SingleTick
         password: password,
       );
       await userCredential.user!.sendEmailVerification();
+      await FirebaseFirestore.instance
+          .collection('customers_details')
+          .doc()
+          .set({
 
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       // Store additional details in Firestore if needed, except password
       // (Since password should never be stored in Firestore)
 

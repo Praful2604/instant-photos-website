@@ -75,15 +75,24 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         return;
       }
 
-      // Check if user document exists in Firestore admins collection
-      final adminDoc =
-          await _firestore.collection('admins').doc(user.uid).get();
-      if (!adminDoc.exists) {
+      // Check if email exists in Firestore admins collection
+      final adminQuery = await _firestore
+          .collection('admins')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      if (adminQuery.docs.isEmpty) {
         await _auth.signOut();
-        setState(() {
-          _errorMessage = 'Access denied. Not an admin account.';
-          _isLoading = false;
-        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Access denied. Your account is not registered as a photographer.'),
+              backgroundColor: Colors.redAccent,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          setState(() => _isLoading = false);
+        }
         return;
       }
 

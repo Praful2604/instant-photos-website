@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/landing_page_screens/home_page.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
+import 'routes/app_routes.dart';
 
 void main() async {
   usePathUrlStrategy();
@@ -22,7 +23,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Instant Photo',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -38,7 +39,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const HomePage(),
+      routerConfig: AppRoutes.router,
 
      //  home: const SimplePageFlip(),
       debugShowCheckedModeBanner: false,

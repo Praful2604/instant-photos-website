@@ -46,17 +46,31 @@ class _ViewAllPhotosState extends State<ViewAllPhotos> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      //backgroundColor: const Color(0xFF1A1A2E),
       appBar: AppBar(
-        title: Text("Photos - QR: ${widget.qrCode}"),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: Text("Photos – ${widget.qrCode}",
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF7F00FF), Color(0xFFE100FF)],
+            ),
+          ),
+        ),
       ),
+
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _imageUrls.isEmpty
           ? const Center(
         child: Text(
           "No photos found for this QR code",
-          style: TextStyle(fontSize: 16),
+          style: TextStyle(fontSize: 16, color: Colors.white70),
         ),
       )
           : GridView.builder(

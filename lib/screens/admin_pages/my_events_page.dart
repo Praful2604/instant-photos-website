@@ -272,7 +272,7 @@ $albumUrl
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (_) => GalleryPage(qrCode: qrCode),
+              builder: (_) => GalleryPage(qrCode: qrCode, eventName: eventName),
             ),
           ),
         ),
@@ -284,12 +284,12 @@ $albumUrl
           onTap: () => _downloadQr(qrCode, eventName),
         ),
 
-        _actionButton(
-          icon: Icons.delete,
-          label: "Delete",
-          gradient: [Colors.redAccent, Colors.red],
-          onTap: () => _confirmDelete(qrCode),
-        ),
+        // _actionButton(
+        //   icon: Icons.delete,
+        //   label: "Delete",
+        //   gradient: [Colors.redAccent, Colors.red],
+        //   onTap: () => _confirmDelete(qrCode),
+        // ),
       ],
     );
   }
@@ -297,19 +297,26 @@ $albumUrl
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F2027),
+      backgroundColor: const Color(0xFF1A1A2E),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF203A43),
-        elevation: 4,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         centerTitle: true,
-        title: Text(
-          "My Events",
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        title: Text("My Events",
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold, color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF7F00FF), Color(0xFFE100FF)],
+            ),
+          ),
         ),
         actions: [
           IconButton(
             tooltip: "Logout",
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: _logout,
           ),
         ],
@@ -345,10 +352,14 @@ $albumUrl
                 margin: const EdgeInsets.only(bottom: 24),
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
+                  color: const Color(0xFF16213E),
                   borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF203A43), Color(0xFF2C5364)],
-                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                        color: Colors.black45,
+                        blurRadius: 16,
+                        offset: Offset(0, 6))
+                  ],
                 ),
                 child: Column(
                   children: [

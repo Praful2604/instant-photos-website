@@ -153,7 +153,24 @@ class _AddPhotosPageState extends State<AddPhotosPage> {
     double progress = _totalToUpload > 0 ? _completedUploads / _totalToUpload : 0;
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Upload Photos (Bulk)"), backgroundColor: Colors.deepPurple),
+     // backgroundColor: const Color(0xFF1A1A2E),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          "Upload Photos",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF7F00FF), Color(0xFFE100FF)],
+            ),
+          ),
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(10.0),
         child: Column(
@@ -169,7 +186,7 @@ class _AddPhotosPageState extends State<AddPhotosPage> {
                 ElevatedButton(onPressed: _isUploading ? null : pickImages, child: const Text("Select Images")),
                 ElevatedButton(
                   onPressed: _isUploading || _selectedFiles.isEmpty ? null : uploadImages,
-                  child: const Text("Start Bulk Upload"),
+                  child: const Text("Start Upload"),
                 ),
               ],
             ),

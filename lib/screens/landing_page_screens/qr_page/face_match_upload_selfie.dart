@@ -55,7 +55,7 @@ class _FaceMatchUploadPageState extends State<FaceMatchUploadPage> {
       _isUploading = true;
     });
 
-    final uri = Uri.parse('http://127.0.0.1:5000/face-match'); // replace with your deployed Flask URL
+    final uri = Uri.parse('http:// 10.123.62.8:5000/face-match'); // replace with your deployed Flask URL
 
     final user = _auth.currentUser ?? (await _auth.signInAnonymously()).user;
     final idToken = await user!.getIdToken(true);

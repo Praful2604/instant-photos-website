@@ -62,22 +62,61 @@ class _AlbumImagesPageState extends State<AlbumImages> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Album Images')),
+        backgroundColor: const Color(0xFF1A1A2E),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Album Images',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          iconTheme: const IconThemeData(color: Colors.white),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                  colors: [Color(0xFF7F00FF), Color(0xFFE100FF)]),
+            ),
+          ),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (favoritePaths.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Album Images')),
+        backgroundColor: const Color(0xFF1A1A2E),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Album Images',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          iconTheme: const IconThemeData(color: Colors.white),
+          flexibleSpace: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                  colors: [Color(0xFF7F00FF), Color(0xFFE100FF)]),
+            ),
+          ),
+        ),
         body: const Center(
-          child: Text('No favorite photos yet.', style: TextStyle(fontSize: 16)),
+          child: Text('No favorite photos yet.', style: TextStyle(fontSize: 16, color: Colors.white70)),
         ),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Album Images')),
+      backgroundColor: const Color(0xFF1A1A2E),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('Album Images',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+                colors: [Color(0xFF7F00FF), Color(0xFFE100FF)]),
+          ),
+        ),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
         child: GridView.builder(
