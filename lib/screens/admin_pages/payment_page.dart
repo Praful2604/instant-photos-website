@@ -58,7 +58,7 @@ class _PaymentPageState extends State<PaymentPage> {
     _attachListeners();
 
     final options = {
-      'key': 'rzp_test_rAxX5l2PqgEx0z',
+      'key': 'rzp_test_ShNSVuxMDhN16N',
       'amount': widget.amount,
       'name': 'Instant Photos',
       'description': '${widget.planName} Plan – ${widget.planLabel}',
@@ -75,12 +75,31 @@ class _PaymentPageState extends State<PaymentPage> {
     final docRef = _db.collection('subscriptions').doc(_user.email);
     final doc = await docRef.get();
     final currentQuota = (doc.data()?['total_quota'] ?? 2) as int;
+
+    // Update subscription quota
     await docRef.set({
       'email': _user.email,
       'total_quota': currentQuota + widget.events,
       'last_payment_id': response.paymentId,
       'updated_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    // Save full payment details to payments collection
+    await _db.collection('payments').add({
+      'email': _user.email,
+      'payment_id': response.paymentId,
+      'order_id': response.orderId,
+      'signature': response.signature,
+      'plan_name': widget.planName,
+      'plan_label': widget.planLabel,
+      'events_added': widget.events,
+      'amount': widget.amount,
+      'amount_display': widget.price,
+      'currency': 'INR',
+      'status': 'success',
+      'paid_at': FieldValue.serverTimestamp(),
+    });
+
     if (mounted) {
       setState(() {
         _isPaying = false;

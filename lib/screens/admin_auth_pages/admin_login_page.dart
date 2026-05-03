@@ -28,11 +28,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   }
 
   bool _isValidPassword(String password) {
-    return password.length >= 8 &&
-        RegExp(r'[A-Z]').hasMatch(password) &&
-        RegExp(r'[a-z]').hasMatch(password) &&
-        RegExp(r'\d').hasMatch(password) &&
-        RegExp(r'[!@#\$&*~.,;?]').hasMatch(password);
+    return password.isNotEmpty;
   }
 
   Future<void> _loginAdmin() async {
@@ -55,7 +51,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     if (!_isValidPassword(password)) {
       setState(() {
         _errorMessage =
-            'Password must be at least 8 characters with uppercase, lowercase, number, and special character.';
+            'Incorrect Password.';
         _isLoading = false;
       });
       return;

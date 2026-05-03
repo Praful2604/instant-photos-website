@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:major_project_website/screens/admin_pages/add_photos_page.dart';
+import 'package:major_project_website/screens/admin_pages/digital_album_upload_page.dart';
 import 'package:major_project_website/screens/admin_pages/client_details_Page.dart';
 import 'package:major_project_website/screens/admin_pages/view_all_photos.dart';
 import 'package:major_project_website/screens/client_pages/gallery_page.dart';
@@ -235,6 +236,17 @@ $albumUrl
           label: "3D Album",
           gradient: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
           onTap: () => open3DAlbum(qrCode),
+        ),
+        _actionButton(
+          icon: Icons.auto_stories_rounded,
+          label: "Digital Album",
+          gradient: [Color(0xFFFF416C), Color(0xFFFF4B2B)],
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DigitalAlbumUploadPage(qrCode: qrCode, eventName: eventName),
+            ),
+          ),
         ),
         _actionButton(
           icon: Icons.panorama,

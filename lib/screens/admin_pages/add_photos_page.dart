@@ -82,9 +82,68 @@ class _AddPhotosPageState extends State<AddPhotosPage> {
     }
   }
 
+  /// Returns true if the user has an active paid subscription
+  Future<bool> _hasSubscription() async {
+    final email = _auth.currentUser?.email;
+    if (email == null) return false;
+    final doc = await _firestore.collection('subscriptions').doc(email).get();
+    final quota = (doc.data()?['total_quota'] ?? 2) as int;
+    // Default free quota is 2; anything higher means they've purchased a plan
+    return quota > 2;
+  }
+
   /// THE CORE UPLOAD LOGIC
   Future<void> uploadImages() async {
     if (_selectedFiles.isEmpty) return;
+
+    // --- Photo limit check ---
+    final subscribed = await _hasSubscription();
+    if (!subscribed) {
+      final currentCount = _uploadedImageUrls.length;
+      const freeLimit = 100;
+      if (currentCount >= freeLimit) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Photo Limit Reached', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: const Text(
+              'Free plan allows up to 100 photos per event.\nUpgrade your subscription to upload unlimited photos.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/subscription');
+                },
+                child: const Text('View Plans', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      // Trim selection so total doesn't exceed 100
+      final allowed = freeLimit - currentCount;
+      if (_selectedFiles.length > allowed) {
+        _selectedFiles = _selectedFiles.take(allowed).toList();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Free plan limit: only $allowed more photo${allowed == 1 ? '' : 's'} can be uploaded. Upgrade for unlimited.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
+    // --- End photo limit check ---
 
     setState(() {
       _isUploading = true;
@@ -180,6 +239,25 @@ class _AddPhotosPageState extends State<AddPhotosPage> {
               Text("Uploading $_completedUploads of $_totalToUpload photos..."),
               const SizedBox(height: 20),
             ],
+            FutureBuilder<bool>(
+              future: _hasSubscription(),
+              builder: (context, snap) {
+                final subscribed = snap.data ?? false;
+                if (subscribed) return const SizedBox.shrink();
+                final count = _uploadedImageUrls.length;
+                final remaining = (100 - count).clamp(0, 100);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Free plan: $count / 100 photos used ($remaining remaining)',
+                    style: TextStyle(
+                      color: remaining == 0 ? Colors.red : Colors.orange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                );
+              },
+            ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
