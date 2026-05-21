@@ -1,3 +1,9 @@
+
+
+https://github.com/user-attachments/assets/e5bb7ad8-1379-46ea-ab43-4aebb8eccabe
+
+
+
 # 📸 Instant Photos
 
 A full-stack photo management and sharing platform built with **Flutter Web**, **Firebase**, and a **Python FastAPI** backend. Designed for photographers and event organizers to capture, manage, and deliver event photos to clients — powered by **AI face recognition**.
